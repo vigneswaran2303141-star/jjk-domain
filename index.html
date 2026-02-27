@@ -1,8 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gojo Domain Expansion</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+      text-align: center;
+      color: white;
+      font-family: Arial;
+    }
+
+    h1 {
+      position: absolute;
+      width: 100%;
+      top: 10px;
+      text-shadow: 0 0 20px purple;
+      z-index: 2;
+    }
+
+    video, canvas {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    canvas {
+      z-index: 1;
+    }
+
+    .energy {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation: explode 1s ease-out forwards;
+      z-index: 3;
+    }
+
+    @keyframes explode {
+      0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(5); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>GOJO DOMAIN ACTIVATED</h1>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
 const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 navigator.mediaDevices.getUserMedia({ video: true })
 .then(stream => {
@@ -13,9 +76,8 @@ function createEnergy(color) {
   const energy = document.createElement("div");
   energy.className = "energy";
   energy.style.background = color;
-  energy.style.boxShadow = `0 0 100px ${color}`;
+  energy.style.boxShadow = `0 0 120px ${color}`;
   document.body.appendChild(energy);
-
   setTimeout(() => energy.remove(), 800);
 }
 
@@ -27,36 +89,40 @@ const hands = new Hands({
 
 hands.setOptions({
   maxNumHands: 1,
-  minDetectionConfidence: 0.6,
-  minTrackingConfidence: 0.6
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
 });
 
 hands.onResults(results => {
-  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const now = Date.now();
-  if (now - lastTrigger < 1500) return; // prevent spam
+  if (results.multiHandLandmarks.length > 0) {
+    const lm = results.multiHandLandmarks[0];
 
-  const lm = results.multiHandLandmarks[0];
+    // Draw hand skeleton
+    drawConnectors(ctx, lm, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 3});
+    drawLandmarks(ctx, lm, {color: '#FF0000', lineWidth: 2});
 
-  const indexUp = lm[8].y < lm[6].y;
-  const middleUp = lm[12].y < lm[10].y;
-  const ringUp = lm[16].y < lm[14].y;
-  const pinkyUp = lm[20].y < lm[18].y;
+    const now = Date.now();
+    if (now - lastTrigger < 1500) return;
 
-  console.log("Gesture:", indexUp, middleUp, ringUp, pinkyUp);
+    const indexUp = lm[8].y < lm[6].y;
+    const middleUp = lm[12].y < lm[10].y;
+    const ringUp = lm[16].y < lm[14].y;
+    const pinkyUp = lm[20].y < lm[18].y;
 
-  if (indexUp && !middleUp && !ringUp && !pinkyUp) {
-    createEnergy("blue");
-    lastTrigger = now;
-  }
-  else if (indexUp && middleUp && !ringUp && !pinkyUp) {
-    createEnergy("red");
-    lastTrigger = now;
-  }
-  else if (indexUp && middleUp && ringUp && pinkyUp) {
-    createEnergy("purple");
-    lastTrigger = now;
+    if (indexUp && !middleUp && !ringUp && !pinkyUp) {
+      createEnergy("blue");
+      lastTrigger = now;
+    }
+    else if (indexUp && middleUp && !ringUp && !pinkyUp) {
+      createEnergy("red");
+      lastTrigger = now;
+    }
+    else if (indexUp && middleUp && ringUp && pinkyUp) {
+      createEnergy("purple");
+      lastTrigger = now;
+    }
   }
 });
 
@@ -70,3 +136,6 @@ const camera = new Camera(video, {
 
 camera.start();
 </script>
+
+</body>
+</html>
