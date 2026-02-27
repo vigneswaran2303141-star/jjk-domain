@@ -6,32 +6,34 @@
   <style>
     body {
       margin: 0;
-      overflow: hidden;
       background: black;
+      overflow: hidden;
       font-family: Arial, sans-serif;
-      text-align: center;
       color: white;
+      text-align: center;
     }
 
     h1 {
       position: absolute;
-      top: 10px;
+      top: 20px;
       width: 100%;
-      z-index: 3;
+      z-index: 10;
       text-shadow: 0 0 20px purple;
+    }
+
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
     }
 
     video, canvas {
       position: absolute;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-    }
-
-    canvas {
-      z-index: 2;
     }
 
     .energy {
@@ -43,7 +45,7 @@
       left: 50%;
       transform: translate(-50%, -50%);
       animation: explode 1s ease-out forwards;
-      z-index: 4;
+      z-index: 20;
     }
 
     @keyframes explode {
@@ -57,8 +59,10 @@
 
 <h1>GOJO DOMAIN ACTIVATED</h1>
 
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas"></canvas>
+<div id="container">
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
@@ -69,12 +73,15 @@ const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-async function setupCamera() {
+async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({ video: true });
   video.srcObject = stream;
+
   return new Promise(resolve => {
     video.onloadedmetadata = () => {
-      resolve(video);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      resolve();
     };
   });
 }
@@ -102,43 +109,33 @@ hands.setOptions({
 });
 
 hands.onResults(results => {
-
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
   if (results.multiHandLandmarks.length > 0) {
+    const lm = results.multiHandLandmarks[0];
 
-    const landmarks = results.multiHandLandmarks[0];
-
-    drawConnectors(ctx, landmarks, HAND_CONNECTIONS,
+    drawConnectors(ctx, lm, HAND_CONNECTIONS,
       { color: "#00FF00", lineWidth: 4 });
-    drawLandmarks(ctx, landmarks,
+    drawLandmarks(ctx, lm,
       { color: "#FF0000", lineWidth: 2 });
 
     const now = Date.now();
     if (now - lastTrigger < 1500) return;
 
-    const indexUp = landmarks[8].y < landmarks[6].y;
-    const middleUp = landmarks[12].y < landmarks[10].y;
-    const ringUp = landmarks[16].y < landmarks[14].y;
-    const pinkyUp = landmarks[20].y < landmarks[18].y;
+    const indexUp = lm[8].y < lm[6].y;
+    const middleUp = lm[12].y < lm[10].y;
+    const ringUp = lm[16].y < lm[14].y;
+    const pinkyUp = lm[20].y < lm[18].y;
 
-    // 🔵 Blue (Index only)
     if (indexUp && !middleUp && !ringUp && !pinkyUp) {
       createEnergy("blue");
       lastTrigger = now;
     }
-
-    // 🔴 Red (Index + Middle)
     else if (indexUp && middleUp && !ringUp && !pinkyUp) {
       createEnergy("red");
       lastTrigger = now;
     }
-
-    // 🟣 Purple (Open palm)
     else if (indexUp && middleUp && ringUp && pinkyUp) {
       createEnergy("purple");
       lastTrigger = now;
@@ -147,7 +144,7 @@ hands.onResults(results => {
 });
 
 async function main() {
-  await setupCamera();
+  await startCamera();
 
   const camera = new Camera(video, {
     onFrame: async () => {
