@@ -2,56 +2,61 @@
 <html>
 <head>
   <title>Gojo Domain Expansion</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
       margin: 0;
-      background: black;
       overflow: hidden;
+      background: black;
+      font-family: Arial, sans-serif;
       text-align: center;
       color: white;
-      font-family: Arial;
     }
 
     h1 {
       position: absolute;
-      width: 100%;
       top: 10px;
+      width: 100%;
+      z-index: 3;
       text-shadow: 0 0 20px purple;
-      z-index: 2;
     }
 
     video, canvas {
       position: absolute;
-      width: 100%;
-      height: 100%;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
       object-fit: cover;
     }
 
     canvas {
-      z-index: 1;
+      z-index: 2;
     }
 
     .energy {
       position: absolute;
-      width: 200px;
-      height: 200px;
+      width: 250px;
+      height: 250px;
       border-radius: 50%;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       animation: explode 1s ease-out forwards;
-      z-index: 3;
+      z-index: 4;
     }
 
     @keyframes explode {
       0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-      100% { transform: translate(-50%, -50%) scale(5); opacity: 0; }
+      100% { transform: translate(-50%, -50%) scale(6); opacity: 0; }
     }
   </style>
 </head>
+
 <body>
 
 <h1>GOJO DOMAIN ACTIVATED</h1>
+
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
 
@@ -60,25 +65,27 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-navigator.mediaDevices.getUserMedia({ video: true })
-.then(stream => {
+async function setupCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
   video.srcObject = stream;
-});
+  return new Promise(resolve => {
+    video.onloadedmetadata = () => {
+      resolve(video);
+    };
+  });
+}
 
 function createEnergy(color) {
   const energy = document.createElement("div");
   energy.className = "energy";
   energy.style.background = color;
-  energy.style.boxShadow = `0 0 120px ${color}`;
+  energy.style.boxShadow = `0 0 200px ${color}`;
   document.body.appendChild(energy);
-  setTimeout(() => energy.remove(), 800);
+  setTimeout(() => energy.remove(), 1000);
 }
 
 let lastTrigger = 0;
@@ -89,36 +96,49 @@ const hands = new Hands({
 
 hands.setOptions({
   maxNumHands: 1,
-  minDetectionConfidence: 0.5,
-  minTrackingConfidence: 0.5
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
 });
 
 hands.onResults(results => {
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
   if (results.multiHandLandmarks.length > 0) {
-    const lm = results.multiHandLandmarks[0];
 
-    // Draw hand skeleton
-    drawConnectors(ctx, lm, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 3});
-    drawLandmarks(ctx, lm, {color: '#FF0000', lineWidth: 2});
+    const landmarks = results.multiHandLandmarks[0];
+
+    drawConnectors(ctx, landmarks, HAND_CONNECTIONS,
+      { color: "#00FF00", lineWidth: 4 });
+    drawLandmarks(ctx, landmarks,
+      { color: "#FF0000", lineWidth: 2 });
 
     const now = Date.now();
     if (now - lastTrigger < 1500) return;
 
-    const indexUp = lm[8].y < lm[6].y;
-    const middleUp = lm[12].y < lm[10].y;
-    const ringUp = lm[16].y < lm[14].y;
-    const pinkyUp = lm[20].y < lm[18].y;
+    const indexUp = landmarks[8].y < landmarks[6].y;
+    const middleUp = landmarks[12].y < landmarks[10].y;
+    const ringUp = landmarks[16].y < landmarks[14].y;
+    const pinkyUp = landmarks[20].y < landmarks[18].y;
 
+    // 🔵 Blue (Index only)
     if (indexUp && !middleUp && !ringUp && !pinkyUp) {
       createEnergy("blue");
       lastTrigger = now;
     }
+
+    // 🔴 Red (Index + Middle)
     else if (indexUp && middleUp && !ringUp && !pinkyUp) {
       createEnergy("red");
       lastTrigger = now;
     }
+
+    // 🟣 Purple (Open palm)
     else if (indexUp && middleUp && ringUp && pinkyUp) {
       createEnergy("purple");
       lastTrigger = now;
@@ -126,15 +146,19 @@ hands.onResults(results => {
   }
 });
 
-const camera = new Camera(video, {
-  onFrame: async () => {
-    await hands.send({ image: video });
-  },
-  width: 640,
-  height: 480
-});
+async function main() {
+  await setupCamera();
 
-camera.start();
+  const camera = new Camera(video, {
+    onFrame: async () => {
+      await hands.send({ image: video });
+    }
+  });
+
+  camera.start();
+}
+
+main();
 </script>
 
 </body>
